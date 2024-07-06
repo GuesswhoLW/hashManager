@@ -89,7 +89,7 @@ hashManager is a Python script designed to manage and monitor your HiveOS mining
 
   Here's a sample interaction with the script:
 
-  ![image](![image](https://github.com/GuesswhoLW/hashManager/assets/174736759/ebe60433-f3c2-4c1e-895d-de11d3f46a4d)
+  [image](https://github.com/GuesswhoLW/hashManager/assets/174736759/ebe60433-f3c2-4c1e-895d-de11d3f46a4d)
 
 
 ## Notes
