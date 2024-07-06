@@ -97,6 +97,14 @@ hashManager is a Python script designed to manage and monitor your HiveOS mining
   - Ensure that the required Python libraries are installed using the requirements.txt file.
   - If using Hive OS credentials, create a .env file with your Hive OS API key and farm ID.
 
+## To Do
+
+  Future integration with MMPOS to expand compatibility and provide additional mining management options.
+  
+## Contributing
+
+  Contributions are welcome! Please submit a pull request, open an issue or contact me on discord @GuesswhoLW to discuss your ideas.
+
 ## License
 
   This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
