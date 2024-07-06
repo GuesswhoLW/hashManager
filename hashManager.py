@@ -77,9 +77,9 @@ class HiveOSManager:
         if network_hashrate == 0:
             my_portion = 0
         else:
-            my_portion = (my_hashrate * 1e-3) / network_hashrate  # Convert my_hashrate from KH/s to MH/s for comparison
+            my_portion = (my_hashrate * 1e-3) / network_hashrate
 
-        daily_network_reward = block_reward * 86400  # Correct total SPR mined per day
+        daily_network_reward = block_reward * 86400
         daily_my_reward = daily_network_reward * my_portion
 
         estimated_daily_usd = daily_my_reward * spr_price
@@ -183,21 +183,18 @@ class HiveOSManager:
             console.print(table)
             estimated_daily_usd = self.calculate_estimated_rewards(network_hashrate, float(summary_info["Hashrate"].replace(" KH/s", "")), block_reward, spr_price)
 
-            # Creating a stylized summary table without headers
             summary_table = Table(show_header=False, box=box.SIMPLE)
             summary_table.add_column("Metric", style="white")
             summary_table.add_column("Value", style="cyan")
             summary_table.add_row("Network Hashrate", f"{network_hashrate:.2f} MH/s")
             summary_table.add_row("Estimated Daily Revenue", f"${estimated_daily_usd:.2f}")
 
-            # Duplicate the summary table
             summary_table_right = Table(show_header=False, box=box.SIMPLE)
             summary_table_right.add_column("Metric", style="white")
             summary_table_right.add_column("Value", style="cyan")
             summary_table_right.add_row("Your Hashrate", summary_info["Hashrate"])
             summary_table_right.add_row("Blocks Found So Far", str(summary_info["Blocks"]))
 
-            # Display both summary tables side by side
             console.print(Columns([summary_table, summary_table_right]))
         else:
             console.print("[bold red]No workers data found.[/bold red]")
