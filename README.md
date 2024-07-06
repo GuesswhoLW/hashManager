@@ -5,7 +5,7 @@ hashManager is a Python script designed to manage and monitor your HiveOS mining
 ## Features
 
 - Fetches and displays detailed information about your HiveOS workers.
-- Monitors network hashrate, SPR price, and block rewards from Spectre Network API.
+- Monitors network hashrate, $SPR price, and block rewards from Spectre Network API.
 - Calculates and displays estimated daily profits in USD.
 - Provides a summary of your farm's performance and block rewards.
 - Automatically updates the display at regular intervals.
@@ -95,7 +95,7 @@ hashManager is a Python script designed to manage and monitor your HiveOS mining
 ## Notes
 
   - Ensure that the required Python libraries are installed using the requirements.txt file.
-  - If using Hive OS credentials, create a .env file with your Hive OS API key and farm ID.
+  - If using Hive OS credentials, create a `.env` file with your Hive OS API key and farm ID.
 
 ## To Do
 
