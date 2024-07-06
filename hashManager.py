@@ -100,10 +100,19 @@ class HiveOSManager:
             else:
                 mining_time_str = 'N/A'
 
-            accepted_shares = worker['miners_summary']['hashrates'][0]['shares'].get('accepted', 0) if 'miners_summary' in worker and 'hashrates' in worker['miners_summary'] and len(worker['miners_summary']['hashrates']) > 0 else 0
+            accepted_shares = 0
+            if 'miners_summary' in worker and 'hashrates' in worker['miners_summary']:
+                hashrates = worker['miners_summary']['hashrates']
+                if len(hashrates) > 0:
+                    shares = hashrates[0].get('shares', {})
+                    accepted_shares = shares.get('accepted', 0)
 
             worker_name = worker.get('name', 'N/A')
-            hashrate = worker['miners_summary']['hashrates'][0]['hash'] if 'miners_summary' in worker and 'hashrates' in worker['miners_summary'] and len(worker['miners_summary']['hashrates']) > 0 else 0.0
+            hashrate = 0.0
+            if 'miners_summary' in worker and 'hashrates' in worker['miners_summary']:
+                hashrates = worker['miners_summary']['hashrates']
+                if len(hashrates) > 0:
+                    hashrate = hashrates[0].get('hash', 0.0)
 
             total_hashrate += hashrate
             total_blocks_found += accepted_shares
@@ -124,8 +133,8 @@ class HiveOSManager:
                 "Name": worker_name,
                 "Status": status,
                 "Temperature": worker['hardware_stats']['cputemp'][0] if 'hardware_stats' in worker and 'cputemp' in worker['hardware_stats'] else 'N/A',
-                "Algo": worker['miners_summary']['hashrates'][0]['algo'] if 'miners_summary' in worker and 'hashrates' in worker['miners_summary'] and len(worker['miners_summary']['hashrates']) > 0 else 'N/A',
-                "Coin": worker['miners_summary']['hashrates'][0]['coin'] if 'miners_summary' in worker and 'hashrates' in worker['miners_summary'] and len(worker['miners_summary']['hashrates']) > 0 else 'N/A',
+                "Algo": hashrates[0].get('algo', 'N/A') if 'miners_summary' in worker and 'hashrates' in worker['miners_summary'] and len(hashrates) > 0 else 'N/A',
+                "Coin": hashrates[0].get('coin', 'N/A') if 'miners_summary' in worker and 'hashrates' in worker['miners_summary'] and len(hashrates) > 0 else 'N/A',
                 "Hashrate": hashrate,
                 "UpTime": mining_time_str,
                 "Blocks": accepted_shares,
