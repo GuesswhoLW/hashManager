@@ -91,11 +91,16 @@ hashManager is a Python script designed to manage and monitor your HiveOS mining
 
   [image](https://github.com/GuesswhoLW/hashManager/assets/174736759/ebe60433-f3c2-4c1e-895d-de11d3f46a4d)
 
+  Here's a sample iteraction with the script using Advanced View:
+  
+  [image](https://github.com/GuesswhoLW/hashManager/assets/174736759/229862d8-ffdc-4a77-8a6c-34bf27fc38c2)
+
 
 ## Notes
 
   - Ensure that the required Python libraries are installed using the requirements.txt file.
   - If using Hive OS credentials, create a `.env` file with your Hive OS API key and farm ID.
+  - Ensure your node is synchronized and the bridge is running when enabling the TNN miner.
 
 ## To Do
 
