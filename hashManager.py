@@ -14,7 +14,7 @@ spectre_api_url = "https://api.spectre-network.org/info/hashrate"
 spr_price_api_url = "https://api.spectre-network.org/info/price"
 block_reward_api_url = "https://api.spectre-network.org/info/blockreward"
 
-class HiveOSManager:
+class HashManager:
     def __init__(self):
         load_dotenv()
         self.hive_os_api_url = "https://api2.hiveos.farm/api/v2"
@@ -23,6 +23,10 @@ class HiveOSManager:
         self.start_time = datetime.utcnow()
         self.blocks_found = {}
         self.previous_status = {}
+        self.tnn_enabled = False
+        self.tnn_ip = ""
+        self.bridge_metrics = {}
+        self.advanced_view = False
 
     def get_headers(self):
         return {
@@ -48,7 +52,7 @@ class HiveOSManager:
         response = requests.get(spectre_api_url)
         if response.status_code == 200:
             data = response.json()
-            current_hashrate = data.get("hashrate", 0) * 1e6  # Convert from TH to MH
+            current_hashrate = data.get("hashrate", 0) * 1e6
             return current_hashrate
         else:
             console.print(f"Failed to fetch hashrate data: {response.status_code} {response.text}", style="bold red")
@@ -86,6 +90,38 @@ class HiveOSManager:
 
         return estimated_daily_usd
 
+    def get_bridge_metrics(self):
+        if not self.tnn_enabled:
+            return
+        try:
+            url = f"http://{self.tnn_ip}:2114/metrics"
+            response = requests.get(url)
+            if response.status_code == 200:
+                try:
+                    metrics = response.text
+                    self.bridge_metrics = self.parse_metrics(metrics)
+                except ValueError as e:
+                    console.print(f"Error parsing bridge metrics: {e}")
+                    console.print(f"Response content: {response.text}")
+            else:
+                console.print(f"Failed to fetch bridge metrics: {response.status_code} {response.text}", style="bold red")
+        except Exception as e:
+            console.print(f"Error fetching bridge metrics: {e}", style="bold red")
+
+    def parse_metrics(self, metrics):
+        data = {}
+        for line in metrics.splitlines():
+            if line.startswith("spr_blocks_mined{"):
+                parts = line.split(",")
+                worker_part = [p for p in parts if p.startswith('worker="')][0]
+                worker_name = worker_part.split('=')[1].strip('"')
+                worker_name = worker_name.split('}')[0].split('"')[0]
+                blocks_count = int(line.split()[-1])
+                data[worker_name] = blocks_count
+                if self.advanced_view:
+                    console.print(f"Parsed {worker_name} with {blocks_count} blocks")
+        return data
+
     def format_workers_data(self, workers_data):
         workers_list = []
         current_time = datetime.utcnow()
@@ -115,13 +151,34 @@ class HiveOSManager:
                     hashrate = hashrates[0].get('hash', 0.0)
 
             total_hashrate += hashrate
-            total_blocks_found += accepted_shares
 
-            if worker_name not in self.blocks_found:
-                self.blocks_found[worker_name] = accepted_shares
-            elif accepted_shares > self.blocks_found[worker_name]:
-                console.print(f"[bold green]{worker_name} has found a Block![/bold green]")
-                self.blocks_found[worker_name] = accepted_shares
+            if not self.tnn_enabled and hashrates[0].get('algo') == 'astrobtw':
+                blocks_found = "[bold red]Enable TNN[/bold red]"
+                if self.advanced_view:
+                    console.print(f"[bold red]Worker: {worker_name} is using 'astrobtw' algo. Enable TNN to fetch blocks.[/bold red]")
+            elif worker_name in self.bridge_metrics:
+                blocks_found = self.bridge_metrics[worker_name]
+                if self.advanced_view:
+                    console.print(f"Worker: {worker_name}, Blocks from Bridge: {blocks_found}")
+
+                if worker_name not in self.blocks_found:
+                    self.blocks_found[worker_name] = blocks_found
+                elif blocks_found > self.blocks_found[worker_name]:
+                    console.print(f"[bold green]{worker_name} has found a Block![/bold green]")
+                    self.blocks_found[worker_name] = blocks_found
+            else:
+                blocks_found = accepted_shares
+                if self.advanced_view:
+                    console.print(f"Worker: {worker_name}, Blocks from Hive: {accepted_shares}")
+                # Show block found message from Hive
+                if worker_name not in self.blocks_found:
+                    self.blocks_found[worker_name] = accepted_shares
+                elif accepted_shares > self.blocks_found[worker_name]:
+                    console.print(f"[bold green]{worker_name} has found a Block![/bold green]")
+                    self.blocks_found[worker_name] = accepted_shares
+
+            if isinstance(blocks_found, int):
+                total_blocks_found += blocks_found
 
             status = "Online" if worker['stats'].get('online', False) else "Offline"
             style = ""
@@ -135,9 +192,9 @@ class HiveOSManager:
                 "Temperature": worker['hardware_stats']['cputemp'][0] if 'hardware_stats' in worker and 'cputemp' in worker['hardware_stats'] else 'N/A',
                 "Algo": hashrates[0].get('algo', 'N/A') if 'miners_summary' in worker and 'hashrates' in worker['miners_summary'] and len(hashrates) > 0 else 'N/A',
                 "Coin": hashrates[0].get('coin', 'N/A') if 'miners_summary' in worker and 'hashrates' in worker['miners_summary'] and len(hashrates) > 0 else 'N/A',
-                "Hashrate": hashrate,
+                "Hashrate": f"{hashrate:.2f}",
                 "UpTime": mining_time_str,
-                "Blocks": accepted_shares,
+                "Blocks": str(blocks_found),
                 "Style": style
             }
             workers_list.append(worker_info)
@@ -156,11 +213,14 @@ class HiveOSManager:
         return workers_list, summary_info
 
     def display_workers(self):
-        console.print("[cyan]Checking Workers...[/cyan]")
+        if self.advanced_view:
+            console.print("[cyan]Checking Workers...[/cyan]")
         workers = self.check_workers()
         network_hashrate = self.get_current_hashrate()
         spr_price = self.get_current_spr_price()
         block_reward = self.get_block_reward()
+        self.get_bridge_metrics()
+
         if workers:
             workers_list, summary_info = self.format_workers_data(workers)
             table = Table(show_header=True, header_style="bold green", box=box.SIMPLE)
@@ -185,7 +245,7 @@ class HiveOSManager:
                     worker["Coin"],
                     str(worker["Hashrate"]),
                     worker["UpTime"],
-                    str(worker["Blocks"]),
+                    worker["Blocks"],
                     style=style
                 )
 
@@ -209,6 +269,8 @@ class HiveOSManager:
             console.print("[bold red]No workers data found.[/bold red]")
 
     def run(self):
+        self.check_tnn_miner()
+        self.check_advanced_view()
         try:
             while True:
                 self.display_workers()
@@ -221,6 +283,18 @@ class HiveOSManager:
         except KeyboardInterrupt:
             console.print("\nExiting...")
 
+    def check_tnn_miner(self):
+        enable_tnn = console.input("[cyan]Do you want to enable TNN miner? (yes/no): [/cyan]").strip().lower()
+        if enable_tnn == 'yes':
+            console.print("[bold green]Ensure the node is synchronized and the bridge is running.[/bold green]")
+            self.tnn_enabled = True
+            self.tnn_ip = console.input("[cyan]Enter the IP address of the host running the node and bridge: [/cyan]").strip()
+
+    def check_advanced_view(self):
+        advanced_view = console.input("[cyan]Do you want to enable the advanced view? (yes/no): [/cyan]").strip().lower()
+        if advanced_view == 'yes':
+            self.advanced_view = True
+
 if __name__ == "__main__":
-    manager = HiveOSManager()
+    manager = HashManager()
     manager.run()
