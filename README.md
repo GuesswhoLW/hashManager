@@ -6,8 +6,11 @@ hashManager is a Python script designed to manage and monitor your HiveOS mining
 
 - Fetches and displays detailed information about your HiveOS workers.
 - Monitors network hashrate, $SPR price, and block rewards from Spectre Network API.
-- Calculates and displays estimated daily profits in USD.
+- Calculates and displays estimated daily revenue in USD.
 - Provides a summary of your farm's performance and block rewards.
+- Option to enable advanced view for detailed logging and debugging.
+- Option to view wallet address and balance.
+- Displays current time and script version.
 - Automatically updates the display at regular intervals.
 
 ## Requirements
@@ -89,12 +92,7 @@ hashManager is a Python script designed to manage and monitor your HiveOS mining
 
   Here's a sample interaction with the script:
 
-  ![image](https://github.com/GuesswhoLW/hashManager/assets/174736759/ebe60433-f3c2-4c1e-895d-de11d3f46a4d)
-
-  Here's a sample iteraction with the script using Advanced View:
-  
-  ![image](https://github.com/GuesswhoLW/hashManager/assets/174736759/229862d8-ffdc-4a77-8a6c-34bf27fc38c2)
-
+  ![image](https://github.com/GuesswhoLW/hashManager/assets/174736759/f055bd53-e36f-4fad-8f42-8fc250d91e9d)
 
 ## Notes
 
