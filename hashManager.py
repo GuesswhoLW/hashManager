@@ -316,7 +316,7 @@ class HashManager:
             summary_table_right.add_row("Your Hashrate", f"{total_hashrate:.2f} KH/s")
             summary_table_right.add_row("Blocks Found So Far", str(total_blocks_found))
             summary_table_right.add_row("", "")
-            summary_table_right.add_row("", "hashManager v1.0")
+            summary_table_right.add_row("", "hashManager v1.1")
 
             console.print(Columns([summary_table, summary_table_right]))
         else:
