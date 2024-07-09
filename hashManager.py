@@ -189,16 +189,19 @@ class HashManager:
 
             total_hashrate += hashrate
 
-            if worker_name in self.bridge_metrics:
-                blocks_found = self.bridge_metrics[worker_name].get("blocks", 0)
-                if self.advanced_view:
-                    console.print(f"Worker: {worker_name}, Blocks from Bridge: {blocks_found}")
+            if miner == 'tnn-miner':
+                if worker_name in self.bridge_metrics:
+                    blocks_found = self.bridge_metrics[worker_name].get("blocks", 0)
+                    if self.advanced_view:
+                        console.print(f"Worker: {worker_name}, Blocks from Bridge: {blocks_found}")
 
-                if worker_name not in self.blocks_found:
-                    self.blocks_found[worker_name] = blocks_found
-                elif blocks_found > self.blocks_found[worker_name]:
-                    console.print(f"[bold green]{worker_name} has found a Block![/bold green]")
-                    self.blocks_found[worker_name] = blocks_found
+                    if worker_name not in self.blocks_found:
+                        self.blocks_found[worker_name] = blocks_found
+                    elif blocks_found > self.blocks_found[worker_name]:
+                        console.print(f"[bold green]{worker_name} has found a Block![/bold green]")
+                        self.blocks_found[worker_name] = blocks_found
+                else:
+                    blocks_found = "[bold red]Enable TNN[/bold red]"
             else:
                 blocks_found = accepted_shares
                 if self.advanced_view:
@@ -316,7 +319,7 @@ class HashManager:
             summary_table_right.add_row("Your Hashrate", f"{total_hashrate:.2f} KH/s")
             summary_table_right.add_row("Blocks Found So Far", str(total_blocks_found))
             summary_table_right.add_row("", "")
-            summary_table_right.add_row("", "hashManager v1.1")
+            summary_table_right.add_row("", "hashManager v1.1.1")
 
             console.print(Columns([summary_table, summary_table_right]))
         else:
