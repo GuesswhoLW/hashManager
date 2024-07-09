@@ -5,7 +5,11 @@
 - Integration with MMPos API to fetch and display worker data.
 - New column in the table to show the source of worker data.
 
-## [v1.1] - 2024-07-07
+## [v1.1.1] - 2024-07-09
+### Fixed
+- Added handling for miner names to ensure blocks from the bridge are correctly shown for tnn-miner.
+  
+## [v1.1.0] - 2024-07-07
 ### Added
 - Integration with TNN miner to fetch and display bridge metrics.
 - Advanced view option for detailed logging and debugging.
@@ -26,7 +30,7 @@
 - Fixed alignment and formatting issues in the summary tables.
 - Addressed connection errors when TNN miner is not enabled but the miner is running.
 
-## [v1.0] - 2024-07-06
+## [v1.0.0] - 2024-07-06
 ### Added
 - Initial release of the HashManager script.
 - Fetches and displays worker data from HiveOS.
