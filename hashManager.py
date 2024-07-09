@@ -13,13 +13,14 @@ console = Console()
 spectre_api_url = "https://api.spectre-network.org/info/hashrate"
 spr_price_api_url = "https://api.spectre-network.org/info/price"
 block_reward_api_url = "https://api.spectre-network.org/info/blockreward"
+balance_api_url = "https://api.spectre-network.org/addresses"
 
 class HashManager:
     def __init__(self):
         load_dotenv()
         self.hive_os_api_url = "https://api2.hiveos.farm/api/v2"
         self.hive_os_api_key = os.getenv("HIVE_OS_API_KEY")
-        self.farm_id = os.getenv("HIVE_OS_FARM_ID")
+        self.hive_farm_id = os.getenv("HIVE_OS_FARM_ID")
         self.start_time = datetime.utcnow()
         self.blocks_found = {}
         self.previous_status = {}
@@ -27,6 +28,9 @@ class HashManager:
         self.tnn_ip = ""
         self.bridge_metrics = {}
         self.advanced_view = False
+        self.wallet_view = False
+        self.wallets = {}
+        self.wallet_balance = "N/A"
 
     def get_headers(self):
         return {
@@ -34,13 +38,33 @@ class HashManager:
             "Content-Type": "application/json"
         }
 
-    def check_workers(self):
-        response = requests.get(f"{self.hive_os_api_url}/farms/{self.farm_id}/workers", headers=self.get_headers())
+    def check_hive_workers(self):
+        response = requests.get(f"{self.hive_os_api_url}/farms/{self.hive_farm_id}/workers", headers=self.get_headers())
         if response.status_code == 200:
             return response.json()
         else:
-            console.print(f"Failed to fetch workers data: {response.status_code} {response.text}", style="bold red")
+            console.print(f"Failed to fetch workers data from HiveOS: {response.status_code} {response.text}", style="bold red")
             return None
+
+    def get_wallet_address(self, farm_id, wallet_id):
+        response = requests.get(f"{self.hive_os_api_url}/farms/{farm_id}/wallets/{wallet_id}", headers=self.get_headers())
+        if response.status_code == 200:
+            data = response.json()
+            return data.get("wal", "")
+        else:
+            console.print(f"Failed to fetch wallet address: {response.status_code} {response.text}", style="bold red")
+            return ""
+
+    def get_wallet_balance(self, wallet_address):
+        response = requests.get(f"{balance_api_url}/{wallet_address}/balance")
+        if response.status_code == 200:
+            data = response.json()
+            balance = data.get("balance", 0)
+            balance = int(balance / 100000000)  # Convert to correct units and remove decimals
+            return str(balance) + " [bold red]SPR[/bold red]"  # Add SPR in red next to it
+        else:
+            console.print(f"Failed to fetch wallet balance: {response.status_code} {response.text}", style="bold red")
+            return "N/A"
 
     def format_timedelta(self, td):
         days = td.days
@@ -117,7 +141,7 @@ class HashManager:
                 worker_name = worker_part.split('=')[1].strip('"')
                 worker_name = worker_name.split('}')[0].split('"')[0]
                 blocks_count = int(line.split()[-1])
-                data[worker_name] = blocks_count
+                data[worker_name] = {"blocks": blocks_count}
                 if self.advanced_view:
                     console.print(f"Parsed {worker_name} with {blocks_count} blocks")
         return data
@@ -128,8 +152,8 @@ class HashManager:
         total_hashrate = 0.0
         total_blocks_found = 0
 
-        for worker in workers_data['data']:
-            miner_start_time = worker['stats'].get('miner_start_time', 0)
+        for worker in workers_data:
+            miner_start_time = worker.get('stats', {}).get('miner_start_time', 0)
             if miner_start_time != 0:
                 mining_time = current_time - datetime.utcfromtimestamp(miner_start_time)
                 mining_time_str = self.format_timedelta(mining_time)
@@ -137,6 +161,7 @@ class HashManager:
                 mining_time_str = 'N/A'
 
             accepted_shares = 0
+            hashrates = []
             if 'miners_summary' in worker and 'hashrates' in worker['miners_summary']:
                 hashrates = worker['miners_summary']['hashrates']
                 if len(hashrates) > 0:
@@ -146,18 +171,26 @@ class HashManager:
             worker_name = worker.get('name', 'N/A')
             hashrate = 0.0
             if 'miners_summary' in worker and 'hashrates' in worker['miners_summary']:
-                hashrates = worker['miners_summary']['hashrates']
                 if len(hashrates) > 0:
                     hashrate = hashrates[0].get('hash', 0.0)
 
+            miner = 'N/A'
+            wallet = 'N/A'
+            if 'flight_sheet' in worker:
+                flight_sheet = worker['flight_sheet']
+                if 'items' in flight_sheet and len(flight_sheet['items']) > 0:
+                    miner = flight_sheet['items'][0].get('miner_alt', 'N/A')
+                    wallet_id = flight_sheet['items'][0].get('wal_id', 'N/A')
+                    if wallet_id not in self.wallets:
+                        wallet_address = self.get_wallet_address(self.hive_farm_id, wallet_id)
+                        self.wallets[wallet_id] = wallet_address
+                        self.wallet_balance = self.get_wallet_balance(wallet_address)
+                    wallet = self.wallets.get(wallet_id, 'N/A')
+
             total_hashrate += hashrate
 
-            if not self.tnn_enabled and hashrates[0].get('algo') == 'astrobtw':
-                blocks_found = "[bold red]Enable TNN[/bold red]"
-                if self.advanced_view:
-                    console.print(f"[bold red]Worker: {worker_name} is using 'astrobtw' algo. Enable TNN to fetch blocks.[/bold red]")
-            elif worker_name in self.bridge_metrics:
-                blocks_found = self.bridge_metrics[worker_name]
+            if worker_name in self.bridge_metrics:
+                blocks_found = self.bridge_metrics[worker_name].get("blocks", 0)
                 if self.advanced_view:
                     console.print(f"Worker: {worker_name}, Blocks from Bridge: {blocks_found}")
 
@@ -170,17 +203,17 @@ class HashManager:
                 blocks_found = accepted_shares
                 if self.advanced_view:
                     console.print(f"Worker: {worker_name}, Blocks from Hive: {accepted_shares}")
-                # Show block found message from Hive
                 if worker_name not in self.blocks_found:
                     self.blocks_found[worker_name] = accepted_shares
                 elif accepted_shares > self.blocks_found[worker_name]:
-                    console.print(f"[bold green]{worker_name} has found a Block![/bold green]")
+                    if worker_name not in self.bridge_metrics:
+                        console.print(f"[bold green]{worker_name} has found a Block![/bold green]")
                     self.blocks_found[worker_name] = accepted_shares
 
             if isinstance(blocks_found, int):
                 total_blocks_found += blocks_found
 
-            status = "Online" if worker['stats'].get('online', False) else "Offline"
+            status = "Online" if worker.get('status') == 'ok' or worker.get('stats', {}).get('online', False) else "Offline"
             style = ""
             if worker_name in self.previous_status and self.previous_status[worker_name] == "Online" and status == "Offline":
                 style = "bold red"
@@ -189,9 +222,9 @@ class HashManager:
             worker_info = {
                 "Name": worker_name,
                 "Status": status,
-                "Temperature": worker['hardware_stats']['cputemp'][0] if 'hardware_stats' in worker and 'cputemp' in worker['hardware_stats'] else 'N/A',
-                "Algo": hashrates[0].get('algo', 'N/A') if 'miners_summary' in worker and 'hashrates' in worker['miners_summary'] and len(hashrates) > 0 else 'N/A',
-                "Coin": hashrates[0].get('coin', 'N/A') if 'miners_summary' in worker and 'hashrates' in worker['miners_summary'] and len(hashrates) > 0 else 'N/A',
+                "Temperature": worker.get('hardware_stats', {}).get('cputemp', ['N/A'])[0],
+                "Algo": hashrates[0].get('algo', 'N/A') if len(hashrates) > 0 else 'N/A',
+                "Miner": miner,
                 "Hashrate": f"{hashrate:.2f}",
                 "UpTime": mining_time_str,
                 "Blocks": str(blocks_found),
@@ -199,41 +232,55 @@ class HashManager:
             }
             workers_list.append(worker_info)
 
-        summary_info = {
-            "Name": "Total",
-            "Status": "",
-            "Temperature": "",
-            "Algo": "",
-            "Coin": "",
-            "Hashrate": f"{total_hashrate:.2f} KH/s",
-            "UpTime": "",
-            "Blocks": total_blocks_found
-        }
-
-        return workers_list, summary_info
+        return workers_list
 
     def display_workers(self):
         if self.advanced_view:
             console.print("[cyan]Checking Workers...[/cyan]")
-        workers = self.check_workers()
-        network_hashrate = self.get_current_hashrate()
-        spr_price = self.get_current_spr_price()
-        block_reward = self.get_block_reward()
-        self.get_bridge_metrics()
+        self.get_bridge_metrics()  # Fetch bridge metrics first
+
+        workers = []
+        if self.hive_os_api_key and self.hive_farm_id:
+            hive_workers = self.check_hive_workers()
+            if hive_workers:
+                hive_workers_list = self.format_workers_data(hive_workers['data'])
+                workers.extend(hive_workers_list)
+
+        # Filter out offline workers
+        workers = [worker for worker in workers if worker["Status"] == "Online"]
 
         if workers:
-            workers_list, summary_info = self.format_workers_data(workers)
+            workers.sort(key=lambda x: x["Name"])  # Sort workers alphabetically by name
+
+            if self.wallet_view:
+                wallet_address = next(iter(self.wallets.values()), "N/A")
+                wallet_balance = self.wallet_balance
+
+                wallet_table = Table(show_header=False, box=box.SIMPLE)
+                wallet_table.add_column("Wallet Address", style="green")
+                wallet_table.add_column("SPR Balance", style="green")
+                wallet_table.add_row(wallet_address, wallet_balance)
+
+                console.print(wallet_table)
+
             table = Table(show_header=True, header_style="bold green", box=box.SIMPLE)
-            table.add_column("Name")
+            table.add_column("Worker")
             table.add_column("Status", justify="center")
             table.add_column("Temp", justify="center")
             table.add_column("Algo", justify="center")
-            table.add_column("Coin", justify="center")
+            table.add_column("Miner", justify="center")
             table.add_column("Hashrate", justify="center")
             table.add_column("UpTime", justify="center")
             table.add_column("Blocks", justify="center")
 
-            for index, worker in enumerate(workers_list):
+            total_hashrate = 0.0
+            total_blocks_found = 0
+
+            for index, worker in enumerate(workers):
+                total_hashrate += float(worker["Hashrate"])
+                if worker["Blocks"].isdigit():
+                    total_blocks_found += int(worker["Blocks"])
+
                 style = "on grey15" if index % 2 == 0 else ""
                 if worker["Style"]:
                     style = worker["Style"]
@@ -242,27 +289,34 @@ class HashManager:
                     worker["Status"],
                     str(worker["Temperature"]),
                     worker["Algo"],
-                    worker["Coin"],
-                    str(worker["Hashrate"]),
+                    worker["Miner"],
+                    worker["Hashrate"],
                     worker["UpTime"],
                     worker["Blocks"],
                     style=style
                 )
 
             console.print(table)
-            estimated_daily_usd = self.calculate_estimated_rewards(network_hashrate, float(summary_info["Hashrate"].replace(" KH/s", "")), block_reward, spr_price)
+            network_hashrate = self.get_current_hashrate()
+            spr_price = self.get_current_spr_price()
+            block_reward = self.get_block_reward()
+            estimated_daily_usd = self.calculate_estimated_rewards(network_hashrate, total_hashrate, block_reward, spr_price)
 
             summary_table = Table(show_header=False, box=box.SIMPLE)
             summary_table.add_column("Metric", style="white")
-            summary_table.add_column("Value", style="cyan")
+            summary_table.add_column("Value", style="green")
             summary_table.add_row("Network Hashrate", f"{network_hashrate:.2f} MH/s")
             summary_table.add_row("Estimated Daily Revenue", f"${estimated_daily_usd:.2f}")
+            summary_table.add_row("", "")
+            summary_table.add_row(datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "")
 
             summary_table_right = Table(show_header=False, box=box.SIMPLE)
             summary_table_right.add_column("Metric", style="white")
-            summary_table_right.add_column("Value", style="cyan")
-            summary_table_right.add_row("Your Hashrate", summary_info["Hashrate"])
-            summary_table_right.add_row("Blocks Found So Far", str(summary_info["Blocks"]))
+            summary_table_right.add_column("Value", style="green")
+            summary_table_right.add_row("Your Hashrate", f"{total_hashrate:.2f} KH/s")
+            summary_table_right.add_row("Blocks Found So Far", str(total_blocks_found))
+            summary_table_right.add_row("", "")
+            summary_table_right.add_row("", "hashManager v1.0")
 
             console.print(Columns([summary_table, summary_table_right]))
         else:
@@ -271,11 +325,12 @@ class HashManager:
     def run(self):
         self.check_tnn_miner()
         self.check_advanced_view()
+        self.check_wallet_view()
         try:
             while True:
                 self.display_workers()
                 for i in range(30):
-                    sys.stdout.write('\r' + 'Loading' + '.' * (i % 4))
+                    sys.stdout.write(f'\rLoading' + '.' * (i % 4))
                     sys.stdout.flush()
                     time.sleep(1)
                 sys.stdout.write('\r' + ' ' * 10 + '\r')
@@ -284,16 +339,54 @@ class HashManager:
             console.print("\nExiting...")
 
     def check_tnn_miner(self):
-        enable_tnn = console.input("[cyan]Do you want to enable TNN miner? (yes/no): [/cyan]").strip().lower()
-        if enable_tnn == 'yes':
-            console.print("[bold green]Ensure the node is synchronized and the bridge is running.[/bold green]")
-            self.tnn_enabled = True
-            self.tnn_ip = console.input("[cyan]Enter the IP address of the host running the node and bridge: [/cyan]").strip()
+        while True:
+            enable_tnn = console.input("[cyan]Do you want to enable TNN miner? (y/n): [/cyan]").strip().lower()
+            if enable_tnn == 'y':
+                console.print("[bold green]Ensure the node is synchronized and the bridge is running.[/bold green]")
+                self.tnn_enabled = True
+                while True:
+                    tnn_ip = console.input("[cyan]Enter the IP address of the host running the node and bridge: [/cyan]").strip()
+                    if self.is_valid_ip(tnn_ip):
+                        self.tnn_ip = tnn_ip
+                        return
+                    else:
+                        console.print("[bold red]Invalid IP address or node/bridge not reachable. Please enter a valid IP address.[/bold red]")
+            elif enable_tnn == 'n':
+                self.tnn_enabled = False
+                return
+            else:
+                console.print("[bold red]Invalid input. Please enter 'y' or 'n'.")
+
+    def is_valid_ip(self, ip):
+        try:
+            response = requests.get(f"http://{ip}:2114/metrics")
+            return response.status_code == 200
+        except requests.exceptions.RequestException:
+            return False
 
     def check_advanced_view(self):
-        advanced_view = console.input("[cyan]Do you want to enable the advanced view? (yes/no): [/cyan]").strip().lower()
-        if advanced_view == 'yes':
-            self.advanced_view = True
+        while True:
+            advanced_view = console.input("[cyan]Do you want to enable the advanced view? (y/n): [/cyan]").strip().lower()
+            if advanced_view == 'y':
+                self.advanced_view = True
+                return
+            elif advanced_view == 'n':
+                self.advanced_view = False
+                return
+            else:
+                console.print("[bold red]Invalid input. Please enter 'y' or 'n'.")
+
+    def check_wallet_view(self):
+        while True:
+            wallet_view = console.input("[cyan]Do you want to enable wallet view? (y/n): [/cyan]").strip().lower()
+            if wallet_view == 'y':
+                self.wallet_view = True
+                return
+            elif wallet_view == 'n':
+                self.wallet_view = False
+                return
+            else:
+                console.print("[bold red]Invalid input. Please enter 'y' or 'n'.")
 
 if __name__ == "__main__":
     manager = HashManager()
