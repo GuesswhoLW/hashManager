@@ -36,7 +36,7 @@ hashManager is a Python script designed to manage and monitor your HiveOS mining
 
 3. Create a .env file in the project directory:
    ```sh
-   touch .env
+   nano .env
   
 4. Add your HiveOS API key and Farm ID to the .env file:
     ```sh
@@ -45,7 +45,7 @@ hashManager is a Python script designed to manage and monitor your HiveOS mining
     
 7. Run the script:
    ```sh
-   python hashmanager.py
+   python hashManager.py
 
 ### On Windows WSL
 
@@ -67,7 +67,7 @@ hashManager is a Python script designed to manage and monitor your HiveOS mining
   
 4. Create a `.env` file in the project directory and add:
     ```sh
-    touch .env  
+    nano .env  
 
 5. Add your HiveOS API key and Farm ID to the .env file:
    ```sh
@@ -76,7 +76,7 @@ hashManager is a Python script designed to manage and monitor your HiveOS mining
 
 6. Create a .gitignore file to ensure the .env file is not uploaded to GitHub:
    ```sh
-   touch .gitignore
+   nano .gitignore
 
 7. Add the following line to the .gitignore file:
     ```sh
@@ -86,7 +86,7 @@ hashManager is a Python script designed to manage and monitor your HiveOS mining
 
 1. Run the script:
    ```sh
-   python3 hashmanager.py
+   python3 hashManager.py
 
 ## Example
 
