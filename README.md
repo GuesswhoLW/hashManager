@@ -99,7 +99,8 @@ hashManager is a Python script designed to manage and monitor your HiveOS mining
   - Ensure that the required Python libraries are installed using the requirements.txt file.
   - If using Hive OS credentials, create a `.env` file with your Hive OS API key and farm ID.
   - If you have trouble finding your farm ID check this [script](https://github.com/GuesswhoLW/showHiveFarmID)
-  - Ensure your node is synchronized and the bridge is running when enabling the TNN miner.
+  - Ensure your node is synchronized and the bridge is running when enabling the bridge.
+  - If using spectre-miner by [BynaryExpr](https://github.com/BinaryExpr), name your workers without symbols like ``_`` or ``-``.
 
 ## To Do
 
