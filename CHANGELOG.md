@@ -5,6 +5,14 @@
 - Integration with MMPos API to fetch and display worker data.
 - New column in the table to show the source of worker data.
 
+##[v1.2.0] - 2024-07-13
+### Added
+- Integration with spectre_miner_x64 to fetch and display bridge metrics.
+- Added rule to add "hive" prefix to worker names parsed from spectre_miner_x64.
+
+### Fixed
+Corrected worker name parsing to ensure bridge metrics are matched correctly.
+
 ## [v1.1.1] - 2024-07-09
 ### Fixed
 - Added handling for miner names to ensure blocks from the bridge are correctly shown for tnn-miner.
