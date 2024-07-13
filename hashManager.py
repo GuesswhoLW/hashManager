@@ -24,8 +24,8 @@ class HashManager:
         self.start_time = datetime.utcnow()
         self.blocks_found = {}
         self.previous_status = {}
-        self.tnn_enabled = False
-        self.tnn_ip = ""
+        self.bridge_enabled = False
+        self.bridge_ip = ""
         self.bridge_metrics = {}
         self.advanced_view = False
         self.wallet_view = False
@@ -60,8 +60,8 @@ class HashManager:
         if response.status_code == 200:
             data = response.json()
             balance = data.get("balance", 0)
-            balance = int(balance / 100000000)  # Convert to correct units and remove decimals
-            return str(balance) + " [bold red]SPR[/bold red]"  # Add SPR in red next to it
+            balance = int(balance / 100000000)
+            return str(balance) + " [bold red]SPR[/bold red]"
         else:
             console.print(f"Failed to fetch wallet balance: {response.status_code} {response.text}", style="bold red")
             return "N/A"
@@ -115,15 +115,16 @@ class HashManager:
         return estimated_daily_usd
 
     def get_bridge_metrics(self):
-        if not self.tnn_enabled:
+        if not self.bridge_enabled:
             return
         try:
-            url = f"http://{self.tnn_ip}:2114/metrics"
+            url = f"http://{self.bridge_ip}:2114/metrics"
             response = requests.get(url)
             if response.status_code == 200:
                 try:
                     metrics = response.text
                     self.bridge_metrics = self.parse_metrics(metrics)
+                    console.print(f"Bridge metrics fetched: {self.bridge_metrics}")
                 except ValueError as e:
                     console.print(f"Error parsing bridge metrics: {e}")
                     console.print(f"Response content: {response.text}")
@@ -138,9 +139,16 @@ class HashManager:
             if line.startswith("spr_blocks_mined{"):
                 parts = line.split(",")
                 worker_part = [p for p in parts if p.startswith('worker="')][0]
-                worker_name = worker_part.split('=')[1].strip('"')
-                worker_name = worker_name.split('}')[0].split('"')[0]
+                worker_name = worker_part.split('=')[1].strip().strip('"')
                 blocks_count = int(line.split()[-1])
+
+                console.print(f"Parsed raw worker name: {worker_name}")
+
+                worker_name = worker_name.split('"}')[0]
+
+                if "spectre_miner_x64" in worker_name:
+                    worker_name = "hive" + worker_name
+
                 data[worker_name] = {"blocks": blocks_count}
                 if self.advanced_view:
                     console.print(f"Parsed {worker_name} with {blocks_count} blocks")
@@ -189,7 +197,11 @@ class HashManager:
 
             total_hashrate += hashrate
 
-            if miner == 'tnn-miner':
+            if miner in ['tnn-miner', 'spectre_miner_x64']:
+                if miner == 'spectre_miner_x64':
+                    worker_name = "hive" + worker_name
+                console.print(f"Checking worker {worker_name} for miner {miner}")
+
                 if worker_name in self.bridge_metrics:
                     blocks_found = self.bridge_metrics[worker_name].get("blocks", 0)
                     if self.advanced_view:
@@ -201,6 +213,7 @@ class HashManager:
                         console.print(f"[bold green]{worker_name} has found a Block![/bold green]")
                         self.blocks_found[worker_name] = blocks_found
                 else:
+                    console.print(f"Bridge metrics not found for worker {worker_name}.")
                     blocks_found = "[bold red]Enable TNN[/bold red]"
             else:
                 blocks_found = accepted_shares
@@ -240,7 +253,7 @@ class HashManager:
     def display_workers(self):
         if self.advanced_view:
             console.print("[cyan]Checking Workers...[/cyan]")
-        self.get_bridge_metrics()  # Fetch bridge metrics first
+        self.get_bridge_metrics()
 
         workers = []
         if self.hive_os_api_key and self.hive_farm_id:
@@ -249,11 +262,10 @@ class HashManager:
                 hive_workers_list = self.format_workers_data(hive_workers['data'])
                 workers.extend(hive_workers_list)
 
-        # Filter out offline workers
         workers = [worker for worker in workers if worker["Status"] == "Online"]
 
         if workers:
-            workers.sort(key=lambda x: x["Name"])  # Sort workers alphabetically by name
+            workers.sort(key=lambda x: x["Name"])
 
             if self.wallet_view:
                 wallet_address = next(iter(self.wallets.values()), "N/A")
@@ -319,14 +331,14 @@ class HashManager:
             summary_table_right.add_row("Your Hashrate", f"{total_hashrate:.2f} KH/s")
             summary_table_right.add_row("Blocks Found So Far", str(total_blocks_found))
             summary_table_right.add_row("", "")
-            summary_table_right.add_row("", "hashManager v1.1.1")
+            summary_table_right.add_row("", "hashManager v1.2.0")
 
             console.print(Columns([summary_table, summary_table_right]))
         else:
             console.print("[bold red]No workers data found.[/bold red]")
 
     def run(self):
-        self.check_tnn_miner()
+        self.check_bridge()
         self.check_advanced_view()
         self.check_wallet_view()
         try:
@@ -341,21 +353,21 @@ class HashManager:
         except KeyboardInterrupt:
             console.print("\nExiting...")
 
-    def check_tnn_miner(self):
+    def check_bridge(self):
         while True:
-            enable_tnn = console.input("[cyan]Do you want to enable TNN miner? (y/n): [/cyan]").strip().lower()
-            if enable_tnn == 'y':
+            enable_bridge = console.input("[cyan]Do you want to enable the bridge? (y/n): [/cyan]").strip().lower()
+            if enable_bridge == 'y':
                 console.print("[bold green]Ensure the node is synchronized and the bridge is running.[/bold green]")
-                self.tnn_enabled = True
+                self.bridge_enabled = True
                 while True:
-                    tnn_ip = console.input("[cyan]Enter the IP address of the host running the node and bridge: [/cyan]").strip()
-                    if self.is_valid_ip(tnn_ip):
-                        self.tnn_ip = tnn_ip
+                    bridge_ip = console.input("[cyan]Enter the IP address of the host running the node and bridge: [/cyan]").strip()
+                    if self.is_valid_ip(bridge_ip):
+                        self.bridge_ip = bridge_ip
                         return
                     else:
                         console.print("[bold red]Invalid IP address or node/bridge not reachable. Please enter a valid IP address.[/bold red]")
-            elif enable_tnn == 'n':
-                self.tnn_enabled = False
+            elif enable_bridge == 'n':
+                self.bridge_enabled = False
                 return
             else:
                 console.print("[bold red]Invalid input. Please enter 'y' or 'n'.")
